@@ -17,12 +17,12 @@ class AuthController extends Controller
     */
     private function otp()
     {
-        return '123456';
+        return '1234';
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Send OTP via Email (API only)
+    | Send OTP via Email
     |--------------------------------------------------------------------------
     */
     public function sendOtp(Request $request)
@@ -41,7 +41,8 @@ class AuthController extends Controller
 
         return response()->json([
             'status'  => true,
-            'message' => 'OTP sent to your email'
+            'message' => 'OTP sent to your email',
+            'data'    => null
         ]);
     }
 
@@ -59,13 +60,15 @@ class AuthController extends Controller
         if ($request->otp !== $this->otp()) {
             return response()->json([
                 'status'  => false,
-                'message' => 'Invalid OTP'
+                'message' => 'Invalid OTP',
+                'data'    => null
             ], 422);
         }
 
         return response()->json([
             'status'  => true,
-            'message' => 'OTP verified successfully'
+            'message' => 'OTP verified successfully',
+            'data'    => null
         ]);
     }
 
@@ -88,7 +91,8 @@ class AuthController extends Controller
         if ($data['otp'] !== $this->otp()) {
             return response()->json([
                 'status'  => false,
-                'message' => 'Invalid OTP'
+                'message' => 'Invalid OTP',
+                'data'    => null
             ], 422);
         }
 
@@ -105,8 +109,10 @@ class AuthController extends Controller
         return response()->json([
             'status'  => true,
             'message' => 'Registered successfully',
-            'token'   => $token,
-            'user'    => $user
+            'data'    => [
+                'token' => $token,
+                'user'  => $user
+            ]
         ], 201);
     }
 
@@ -127,7 +133,8 @@ class AuthController extends Controller
         if (! $user || ! Hash::check($request->password, $user->password)) {
             return response()->json([
                 'status'  => false,
-                'message' => 'Invalid credentials'
+                'message' => 'Invalid credentials',
+                'data'    => null
             ], 401);
         }
 
@@ -136,8 +143,10 @@ class AuthController extends Controller
         return response()->json([
             'status'  => true,
             'message' => 'Logged in successfully',
-            'token'   => $token,
-            'user'    => $user
+            'data'    => [
+                'token' => $token,
+                'user'  => $user
+            ]
         ]);
     }
 
@@ -149,8 +158,11 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         return response()->json([
-            'status' => true,
-            'user'   => $request->user()
+            'status'  => true,
+            'message' => 'User data',
+            'data'    => [
+                'user' => $request->user()
+            ]
         ]);
     }
 
@@ -165,7 +177,8 @@ class AuthController extends Controller
 
         return response()->json([
             'status'  => true,
-            'message' => 'Logged out successfully'
+            'message' => 'Logged out successfully',
+            'data'    => null
         ]);
     }
 
@@ -185,7 +198,8 @@ class AuthController extends Controller
         if ($request->otp !== $this->otp()) {
             return response()->json([
                 'status'  => false,
-                'message' => 'Invalid OTP'
+                'message' => 'Invalid OTP',
+                'data'    => null
             ], 422);
         }
 
@@ -197,7 +211,8 @@ class AuthController extends Controller
 
         return response()->json([
             'status'  => true,
-            'message' => 'Password reset successfully'
+            'message' => 'Password reset successfully',
+            'data'    => null
         ]);
     }
 }
