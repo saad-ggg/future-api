@@ -69,7 +69,7 @@ class UserController extends Controller
         ]);
     }
 
-    // 🔥 Ban user
+    //  Ban user
     public function ban($id)
     {
         $user = User::findOrFail($id);
@@ -91,7 +91,7 @@ class UserController extends Controller
         ]);
     }
 
-    // 🔥 Unban user
+    //  Unban user
     public function unban($id)
     {
         $user = User::findOrFail($id);
