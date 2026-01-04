@@ -6,62 +6,56 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\Admin\UserController;
 
 /*
-|--------------------------------------------------------------------------
-| Public Routes (Auth + OTP)
-|--------------------------------------------------------------------------
+|-------------------------------------------------------------------------- 
+| Public Routes
+|-------------------------------------------------------------------------- 
 */
 
-// OTP
+// OTP and Authentication
 Route::post('/otp/send', [AuthController::class, 'sendOtp']);
 Route::post('/otp/verify', [AuthController::class, 'verifyOtp']);
-
-// Auth
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/password/reset', [AuthController::class, 'resetPassword']);
 
 /*
-|--------------------------------------------------------------------------
-| Protected Routes (User)
-|--------------------------------------------------------------------------
+|-------------------------------------------------------------------------- 
+| Authenticated User Routes
+|-------------------------------------------------------------------------- 
 */
 Route::middleware('auth:sanctum')->group(function () {
 
-    // Auth
+    // Account Session
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // Profile
+    /**
+     * Profile Management
+     * POST is used for /profile to support multipart/form-data (Avatar uploads)
+     */
     Route::get('/profile', [ProfileController::class, 'show']);
-    Route::put('/profile', [ProfileController::class, 'update']);
-    Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar']);
-    Route::put('/profile/email', [ProfileController::class, 'updateEmail']);
+    Route::post('/profile', [ProfileController::class, 'update']); 
     Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
 });
 
 /*
-|--------------------------------------------------------------------------
-| Admin Routes
-|--------------------------------------------------------------------------
+|-------------------------------------------------------------------------- 
+| Administrative Routes
+|-------------------------------------------------------------------------- 
 */
 Route::middleware(['auth:sanctum', 'admin'])
     ->prefix('admin')
     ->group(function () {
 
-        // Test
-        Route::get('/test', function () {
-            return response()->json([
-                'status' => true,
-                'message' => 'Admin only access'
-            ]);
-        });
+        // Health check for admin middleware
+        Route::get('/test', fn() => response()->json(['status' => true, 'message' => 'Admin access confirmed']));
 
-        // Users CRUD
-        Route::get('/users', [UserController::class, 'index']);
-        Route::get('/users/{id}', [UserController::class, 'show']);
-        Route::put('/users/{id}', [UserController::class, 'update']);
-        Route::delete('/users/{id}', [UserController::class, 'destroy']);
-        //BAN
-         Route::post('/users/{id}/ban', [UserController::class, 'ban']);
-        Route::post('/users/{id}/unban', [UserController::class, 'unban']);
+        /**
+         * Users CRUD
+         */
+        Route::apiResource('users', UserController::class);
+
+        //  Ban/Unban
+        Route::post('/users/{user}/ban', [UserController::class, 'ban']);
+        Route::post('/users/{user}/unban', [UserController::class, 'unban']);
 });

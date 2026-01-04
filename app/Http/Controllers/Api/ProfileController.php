@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use App\Http\Requests\UpdatePasswordRequest; // Assuming you created the Request file
 
 class ProfileController extends Controller
 {
-    // Show authenticated user profile
+    /**
+     * Display the authenticated user's profile.
+     */
     public function show(Request $request)
     {
         return response()->json([
@@ -18,95 +21,75 @@ class ProfileController extends Controller
         ]);
     }
 
-    // Update profile (name + bio)
+    /**
+     * Update basic profile information and avatar.
+     * Password update is handled in a separate method.
+     */
     public function update(Request $request)
     {
         $user = $request->user();
 
-        $data = $request->validate([
-            'first_name' => 'required|string|max:255',
-            'last_name'  => 'required|string|max:255',
-            'bio'        => 'nullable|string',
+        /** * Validate profile data. 
+         * 'sometimes' allows updating only specific fields sent in the request.
+         */
+        $request->validate([
+            'first_name' => 'sometimes|required|string|max:255',
+            'last_name'  => 'sometimes|required|string|max:255',
+            'bio'        => 'sometimes|nullable|string',
+            'email'      => 'sometimes|required|email|unique:users,email,' . $user->id,
+            'avatar'     => 'sometimes|required|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
-        $user->update($data);
+        /** * Update textual information.
+         */
+        $user->fill($request->only(['first_name', 'last_name', 'bio', 'email']));
+
+        /** * Handle email verification reset if email is modified.
+         */
+        if ($request->has('email') && $user->isDirty('email')) {
+            $user->email_verified_at = null;
+        }
+
+        /** * Handle avatar upload and storage cleanup.
+         */
+        if ($request->hasFile('avatar')) {
+            if ($user->avatar) {
+                Storage::disk('public')->delete($user->avatar);
+            }
+            $user->avatar = $request->file('avatar')->store('avatars', 'public');
+        }
+
+        $user->save();
 
         return response()->json([
             'status' => true,
             'message' => 'Profile updated successfully',
-            'user' => $user
+            'user' => $user,
+            'avatar_url' => $user->avatar ? asset('storage/' . $user->avatar) : null
         ]);
     }
 
-    // Update profile avatar
-    public function updateAvatar(Request $request)
-    {
-        $request->validate([
-            'avatar' => 'required|image|mimes:jpg,jpeg,png|max:2048',
-        ]);
-
-        $user = $request->user();
-
-        if ($user->avatar) {
-            Storage::disk('public')->delete($user->avatar);
-        }
-
-        $path = $request->file('avatar')->store('avatars', 'public');
-
-        $user->update([
-            'avatar' => $path
-        ]);
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Avatar updated successfully',
-            'avatar_url' => asset('storage/' . $path)
-        ]);
-    }
-
-    // Update email
-    public function updateEmail(Request $request)
+    /**
+     * Dedicated method for password updates with strict verification.
+     */
+    public function updatePassword(UpdatePasswordRequest $request)
     {
         $user = $request->user();
 
-        $data = $request->validate([
-            'email' => 'required|email|unique:users,email,' . $user->id,
-        ]);
-
-        $user->update([
-            'email' => $data['email'],
-            'email_verified_at' => null,
-        ]);
-
-        return response()->json([
-            'status' => true,
-            'message' => 'Email updated successfully',
-            'email' => $user->email,
-        ]);
-    }
-
-    // Update password
-    public function updatePassword(Request $request)
-    {
-        $request->validate([
-            'current_password' => 'required',
-            'password' => 'required|min:8|confirmed',
-        ]);
-
-        $user = $request->user();
-
+        /** * Check if the provided current password matches the database record.
+         */
         if (!Hash::check($request->current_password, $user->password)) {
             return response()->json([
                 'status' => false,
-                'message' => 'Current password is incorrect',
+                'message' => 'The provided current password does not match our records.',
             ], 422);
         }
 
-        $user->update([
-            'password' => Hash::make($request->password),
-        ]);
-
+        /** * Update password and invalidate existing sessions/tokens.
+         */
+        $user->password = Hash::make($request->password);
         $user->tokens()->delete();
+        $user->save();
 
         return response()->json([
             'status' => true,

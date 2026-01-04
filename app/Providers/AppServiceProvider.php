@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Pagination\Paginator; // Import the Paginator class
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,6 +20,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        /**
+         * Instruct Laravel to use Bootstrap 5 styling for pagination.
+         * This prevents the pagination buttons from appearing oversized (Tailwind default).
+         */
+        Paginator::useBootstrapFive();
     }
 }
