@@ -12,7 +12,7 @@ class AuthController extends Controller
 {
     /*
     |--------------------------------------------------------------------------
-    | OTP (Mock)
+    | OTP Configuration (Mock)
     |--------------------------------------------------------------------------
     */
     private function otp()
@@ -22,59 +22,7 @@ class AuthController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | Send OTP via Email
-    |--------------------------------------------------------------------------
-    */
-    public function sendOtp(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email'
-        ]);
-
-        Mail::raw(
-            'Your OTP code is: ' . $this->otp(),
-            function ($message) use ($request) {
-                $message->to($request->email)
-                        ->subject('Your OTP Code');
-            }
-        );
-
-        return response()->json([
-            'status'  => true,
-            'message' => 'OTP sent to your email',
-            'data'    => null
-        ]);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Verify OTP
-    |--------------------------------------------------------------------------
-    */
-    public function verifyOtp(Request $request)
-    {
-        $request->validate([
-            'otp' => 'required|string'
-        ]);
-
-        if ($request->otp !== $this->otp()) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Invalid OTP',
-                'data'    => null
-            ], 422);
-        }
-
-        return response()->json([
-            'status'  => true,
-            'message' => 'OTP verified successfully',
-            'data'    => null
-        ]);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Register (with OTP)
+    | Registration
     |--------------------------------------------------------------------------
     */
     public function register(Request $request)
@@ -85,16 +33,7 @@ class AuthController extends Controller
             'email'      => 'required|email|unique:users,email',
             'phone'      => 'required|string|max:20|unique:users,phone',
             'password'   => 'required|min:8',
-            'otp'        => 'required|string',
         ]);
-
-        if ($data['otp'] !== $this->otp()) {
-            return response()->json([
-                'status'  => false,
-                'message' => 'Invalid OTP',
-                'data'    => null
-            ], 422);
-        }
 
         $user = User::create([
             'first_name' => $data['first_name'],
@@ -104,21 +43,70 @@ class AuthController extends Controller
             'password'   => Hash::make($data['password']),
         ]);
 
-        $token = $user->createToken('api_token')->plainTextToken;
-
         return response()->json([
             'status'  => true,
-            'message' => 'Registered successfully',
-            'data'    => [
-                'token' => $token,
-                'user'  => $user
-            ]
+            'message' => 'User registered. Please verify your account using the OTP sent to your email.',
+            'data'    => ['email' => $user->email]
         ], 201);
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Login
+    | OTP Management (Send & Verify)
+    |--------------------------------------------------------------------------
+    */
+    public function sendOtp(Request $request)
+    {
+        $request->validate(['email' => 'required|email |exists:users,email']);
+
+        Mail::raw(
+            'Your OTP code is: ' . $this->otp(),
+            function ($message) use ($request) {
+                $message->to($request->email)->subject('Your OTP Code');
+            }
+        );
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'OTP sent to your email',
+            'data'    => null
+        ]);
+    }
+
+    public function verifyOtp(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email|exists:users,email',
+            'otp'   => 'required|string',
+        ]);
+
+        if ($request->otp !== $this->otp()) { 
+            return response()->json([
+                'status'  => false,
+                'message' => 'Invalid OTP',
+                'data'    => null
+            ], 422);
+        }
+
+        $user = User::where('email', $request->email)->first();
+        $user->email_verified_at = now();
+        $user->save();
+
+        $token = $user->createToken('api_token')->plainTextToken;
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Account verified successfully',
+            'data'    => [
+                'token' => $token,
+                'user'  => $user
+            ]
+        ], 200);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authentication (Login & Logout)
     |--------------------------------------------------------------------------
     */
     public function login(Request $request)
@@ -150,27 +138,6 @@ class AuthController extends Controller
         ]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Get Authenticated User
-    |--------------------------------------------------------------------------
-    */
-    public function me(Request $request)
-    {
-        return response()->json([
-            'status'  => true,
-            'message' => 'User data',
-            'data'    => [
-                'user' => $request->user()
-            ]
-        ]);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Logout
-    |--------------------------------------------------------------------------
-    */
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
@@ -184,9 +151,18 @@ class AuthController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | Reset Password (with OTP)
+    | User Profile & Password Reset
     |--------------------------------------------------------------------------
     */
+    public function me(Request $request)
+    {
+        return response()->json([
+            'status'  => true,
+            'message' => 'User data',
+            'data'    => ['user' => $request->user()]
+        ]);
+    }
+
     public function resetPassword(Request $request)
     {
         $request->validate([
@@ -204,10 +180,7 @@ class AuthController extends Controller
         }
 
         $user = User::where('email', $request->email)->first();
-
-        $user->update([
-            'password' => Hash::make($request->password)
-        ]);
+        $user->update(['password' => Hash::make($request->password)]);
 
         return response()->json([
             'status'  => true,
